@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import PDFUploader from '@/Components/PDFUploader';
+import PDFUploader from '@/components/PDFUploader';
+import PDFViewer from '@/components/PDFViewer';
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
@@ -13,7 +15,7 @@ export default function Home() {
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (file) {
-      alert(`PDF ${file.name} is ready for signing!`);
+      setShowPDFViewer(true);
     }
   };
 
@@ -47,6 +49,13 @@ export default function Home() {
           </button>
         </form>
       </div>
+
+      {showPDFViewer && file && (
+        <PDFViewer
+          file={file}
+          onClose={() => setShowPDFViewer(false)}
+        />
+      )}
     </div>
   );
 }

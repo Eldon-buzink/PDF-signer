@@ -32,15 +32,11 @@ const PDFViewerComponent = dynamic(
   async () => {
     const { initializePdfJs } = await import('@/utils/pdfjs-config');
     
-    const PDFViewer = ({ file, onClose }: PDFViewerProps) => {
+    const PDFViewer = ({ file, currentPage, setCurrentPage, numPages, setNumPages, scale, setIsRendering }: PDFViewerProps) => {
       const containerRef = useRef<HTMLDivElement>(null);
       const [isLoading, setIsLoading] = useState(true);
       const [error, setError] = useState<string | null>(null);
       const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
-      const [currentPage, setCurrentPage] = useState(1);
-      const [numPages, setNumPages] = useState(0);
-      const [scale, setScale] = useState(1.0);
-      const [isRendering, setIsRendering] = useState(false);
 
       const renderPage = useCallback(async (pdf: PDFDocumentProxy, pageNumber: number) => {
         if (!containerRef.current) return;
@@ -87,7 +83,7 @@ const PDFViewerComponent = dynamic(
           renderLock.release();
           setIsRendering(false);
         }
-      }, [scale]);
+      }, [scale, setIsRendering]);
 
       // Load PDF document
       useEffect(() => {
@@ -132,7 +128,7 @@ const PDFViewerComponent = dynamic(
             }
           }
         };
-      }, [file, renderPage]);
+      }, [file, renderPage, setCurrentPage, setNumPages]);
 
       // Render page when page number or scale changes
       useEffect(() => {
@@ -140,111 +136,23 @@ const PDFViewerComponent = dynamic(
         renderPage(pdfDoc, currentPage);
       }, [currentPage, pdfDoc, renderPage]);
 
-      const handlePreviousPage = () => {
-        if (currentPage > 1 && !isRendering) {
-          setCurrentPage(prev => prev - 1);
-        }
-      };
-
-      const handleNextPage = () => {
-        if (currentPage < numPages && !isRendering) {
-          setCurrentPage(prev => prev + 1);
-        }
-      };
-
-      const handleZoomIn = () => {
-        if (!isRendering) {
-          setScale(prev => Math.min(prev + 0.2, 3.0));
-        }
-      };
-
-      const handleZoomOut = () => {
-        if (!isRendering) {
-          setScale(prev => Math.max(prev - 0.2, 0.5));
-        }
-      };
-
       return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">
-                {file.name} (Page {currentPage} of {numPages})
-              </h2>
-              <button
-                onClick={onClose}
-                className="text-gray-600 hover:text-gray-800"
-                aria-label="Close"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="flex justify-center space-x-4 mb-4">
-              <button
-                onClick={handlePreviousPage}
-                disabled={currentPage <= 1 || isRendering}
-                className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                onClick={handleZoomOut}
-                disabled={isRendering}
-                className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
-              >
-                Zoom Out
-              </button>
-              <span className="px-3 py-1">{Math.round(scale * 100)}%</span>
-              <button
-                onClick={handleZoomIn}
-                disabled={isRendering}
-                className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
-              >
-                Zoom In
-              </button>
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage >= numPages || isRendering}
-                className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-
-            <div className="relative overflow-auto flex justify-center">
-              {(isLoading || isRendering) && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="w-full h-full flex flex-col">
+          <div className="flex-1 relative overflow-auto bg-gray-100 rounded-lg">
+            {(isLoading) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+              </div>
+            )}
+            {error && (
+              <div className="absolute inset-0 flex items-center justify-center bg-red-50">
+                <div className="text-red-600 p-4 text-center">
+                  <p className="font-semibold">Error loading PDF</p>
+                  <p className="text-sm mt-2">{error}</p>
                 </div>
-              )}
-              {error && (
-                <div className="absolute inset-0 flex items-center justify-center bg-red-50">
-                  <div className="text-red-600 p-4 text-center">
-                    <p className="font-semibold">Error loading PDF</p>
-                    <p className="text-sm mt-2">{error}</p>
-                  </div>
-                </div>
-              )}
-              <div ref={containerRef} className="flex justify-center" />
-            </div>
-
-            <div className="mt-4 flex justify-end space-x-3">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={isRendering}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
-                Add Signature
-              </button>
-            </div>
+              </div>
+            )}
+            <div ref={containerRef} className="min-h-full flex items-center justify-center p-4" />
           </div>
         </div>
       );
@@ -266,7 +174,12 @@ const PDFViewerComponent = dynamic(
 
 interface PDFViewerProps {
   file: File;
-  onClose: () => void;
+  currentPage: number;
+  setCurrentPage: (page: number) => void;
+  numPages: number;
+  setNumPages: (num: number) => void;
+  scale: number;
+  setIsRendering: (isRendering: boolean) => void;
 }
 
 export default function PDFViewer(props: PDFViewerProps) {

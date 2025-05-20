@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import type { PDFDocumentProxy, PDFPageProxy } from '@/utils/pdfjs-config';
+import SignatureCanvas from './SignatureCanvas';
+import SignatureElement from './SignatureElement';
 
 // Create a singleton render lock
 const renderLock = {
@@ -32,11 +34,12 @@ const PDFViewerComponent = dynamic(
   async () => {
     const { initializePdfJs } = await import('@/utils/pdfjs-config');
     
-    const PDFViewer = ({ file, currentPage, setCurrentPage, numPages, setNumPages, scale, setIsRendering }: PDFViewerProps) => {
+    const PDFViewer = ({ file, currentPage, setCurrentPage, numPages, setNumPages, scale, setIsRendering, isDrawingMode, onDrawingComplete, onDrawingCancel, signatures, onSignatureUpdate, onSignatureDelete }: PDFViewerProps) => {
       const containerRef = useRef<HTMLDivElement>(null);
       const [isLoading, setIsLoading] = useState(true);
       const [error, setError] = useState<string | null>(null);
       const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
+      const [canvasRect, setCanvasRect] = useState<{left: number, top: number, width: number, height: number} | null>(null);
 
       const renderPage = useCallback(async (pdf: PDFDocumentProxy, pageNumber: number) => {
         if (!containerRef.current) return;
@@ -136,6 +139,22 @@ const PDFViewerComponent = dynamic(
         renderPage(pdfDoc, currentPage);
       }, [currentPage, pdfDoc, renderPage]);
 
+      // Track PDF canvas position and size after rendering
+      useEffect(() => {
+        if (!containerRef.current) return;
+        const canvas = containerRef.current.querySelector('canvas');
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const parentRect = containerRef.current.getBoundingClientRect();
+          setCanvasRect({
+            left: rect.left - parentRect.left,
+            top: rect.top - parentRect.top,
+            width: rect.width,
+            height: rect.height,
+          });
+        }
+      }, [currentPage, scale, isLoading]);
+
       return (
         <div className="w-full h-full flex flex-col">
           <div className="flex-1 relative overflow-auto bg-gray-100 rounded-lg">
@@ -152,7 +171,26 @@ const PDFViewerComponent = dynamic(
                 </div>
               </div>
             )}
-            <div ref={containerRef} className="min-h-full flex items-center justify-center p-4" />
+            <div ref={containerRef} className="min-h-full flex items-center justify-center p-4 relative">
+              {/* Signature Canvas Layer */}
+              <SignatureCanvas
+                isDrawing={isDrawingMode}
+                onDrawingComplete={onDrawingComplete}
+                onCancel={onDrawingCancel}
+                containerRef={containerRef}
+                canvasRect={canvasRect}
+              />
+              
+              {/* Placed Signatures */}
+              {signatures.map((signature) => (
+                <SignatureElement
+                  key={signature.id}
+                  signature={signature}
+                  onUpdate={onSignatureUpdate}
+                  onDelete={onSignatureDelete}
+                />
+              ))}
+            </div>
           </div>
         </div>
       );
@@ -172,6 +210,13 @@ const PDFViewerComponent = dynamic(
   }
 );
 
+interface Signature {
+  id: string;
+  data: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+}
+
 interface PDFViewerProps {
   file: File;
   currentPage: number;
@@ -180,6 +225,12 @@ interface PDFViewerProps {
   setNumPages: (num: number) => void;
   scale: number;
   setIsRendering: (isRendering: boolean) => void;
+  isDrawingMode: boolean;
+  onDrawingComplete: (signature: Signature) => void;
+  onDrawingCancel: () => void;
+  signatures: Signature[];
+  onSignatureUpdate: (signature: Signature) => void;
+  onSignatureDelete: (id: string) => void;
 }
 
 export default function PDFViewer(props: PDFViewerProps) {

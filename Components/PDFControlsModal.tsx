@@ -72,29 +72,31 @@ const PDFControlsModal: React.FC<PDFControlsModalProps> = ({
           +
         </button>
       </div>
-      {/* Action buttons vertical group with extra spacing */}
-      <div className="flex flex-col items-center space-y-2 w-full mt-2">
+      {/* Action buttons horizontal group */}
+      <div className="flex flex-row items-center space-x-2 w-full mb-4">
         <button
           onClick={onAddText}
           disabled={isRendering}
-          className="w-full min-w-[110px] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium shadow-sm whitespace-nowrap"
+          className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium shadow-sm flex items-center justify-center text-2xl"
+          title="Add Text"
         >
-          Add Text
+          🅰️
         </button>
         <button
           onClick={onAddSignature}
           disabled={isRendering}
-          className="w-full min-w-[130px] px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium shadow-sm whitespace-nowrap"
+          className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium shadow-sm flex items-center justify-center text-2xl"
+          title="Add Signature"
         >
-          Add Signature
-        </button>
-        <button
-          onClick={onCancel}
-          className="w-full px-4 py-2 text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg font-medium shadow-sm whitespace-nowrap mt-4"
-        >
-          Cancel
+          ✏️
         </button>
       </div>
+      <button
+        onClick={onCancel}
+        className="w-full px-4 py-2 text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg font-medium shadow-sm whitespace-nowrap"
+      >
+        Cancel
+      </button>
     </div>
   );
 };

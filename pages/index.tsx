@@ -5,6 +5,13 @@ import PDFUploader from '@/components/PDFUploader';
 import PDFViewer from '@/components/PDFViewer';
 import PDFControlsModal from '@/components/PDFControlsModal';
 
+interface Signature {
+  id: string;
+  data: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [showPDFViewer, setShowPDFViewer] = useState(false);
@@ -12,6 +19,8 @@ export default function Home() {
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(1.0);
   const [isRendering, setIsRendering] = useState(false);
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [signatures, setSignatures] = useState<Signature[]>([]);
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
@@ -57,10 +66,29 @@ export default function Home() {
     // Placeholder for add text functionality
   };
   const handleAddSignature = () => {
-    // Placeholder for add signature functionality
+    setIsDrawingMode(true);
   };
   const handleCloseModal = () => {
     setShowPDFViewer(false);
+  };
+
+  const handleDrawingComplete = (signature: Signature) => {
+    setSignatures((prev) => [...prev, signature]);
+    setIsDrawingMode(false);
+  };
+
+  const handleDrawingCancel = () => {
+    setIsDrawingMode(false);
+  };
+
+  const handleSignatureUpdate = (updatedSignature: Signature) => {
+    setSignatures((prev) =>
+      prev.map((sig) => (sig.id === updatedSignature.id ? updatedSignature : sig))
+    );
+  };
+
+  const handleSignatureDelete = (id: string) => {
+    setSignatures((prev) => prev.filter((sig) => sig.id !== id));
   };
 
   return (
@@ -127,6 +155,12 @@ export default function Home() {
                     setNumPages={setNumPages}
                     scale={scale}
                     setIsRendering={setIsRendering}
+                    isDrawingMode={isDrawingMode}
+                    onDrawingComplete={handleDrawingComplete}
+                    onDrawingCancel={handleDrawingCancel}
+                    signatures={signatures}
+                    onSignatureUpdate={handleSignatureUpdate}
+                    onSignatureDelete={handleSignatureDelete}
                   />
                   <style>{`
                     .pdf-preview-container canvas {

@@ -11,15 +11,20 @@
   "dependencies": {
     "@types/pdfjs-dist": "^2.10.377",
     "next": "14.1.0",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "5.2.133",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-dropzone": "^14.2.3"
+    "react-draggable": "^4.4.6",
+    "react-dropzone": "^14.2.3",
+    "react-resizable": "^3.0.5",
+    "react-signature-canvas": "^1.1.0-alpha.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@types/react-resizable": "^3.0.8",
     "autoprefixer": "^10.4.17",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",

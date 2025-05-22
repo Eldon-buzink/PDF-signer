@@ -8,6 +8,7 @@ interface Signature {
   data: string;
   position: { x: number; y: number };
   size: { width: number; height: number };
+  page: number;
 }
 
 interface SignatureElementProps {
@@ -16,6 +17,13 @@ interface SignatureElementProps {
   onDelete: (id: string) => void;
 }
 
+const handleStyles = {
+  topLeft: { left: -8, top: -8, cursor: 'nwse-resize' },
+  topRight: { right: -8, top: -8, cursor: 'nesw-resize' },
+  bottomLeft: { left: -8, bottom: -8, cursor: 'nesw-resize' },
+  bottomRight: { right: -8, bottom: -8, cursor: 'nwse-resize' },
+};
+
 const SignatureElement: React.FC<SignatureElementProps> = ({
   signature,
   onUpdate,
@@ -23,6 +31,7 @@ const SignatureElement: React.FC<SignatureElementProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   const handleDragStop = useCallback(
     (e: any, data: { x: number; y: number }) => {
@@ -54,6 +63,26 @@ const SignatureElement: React.FC<SignatureElementProps> = ({
     setIsResizing(true);
   }, []);
 
+  // Custom handle for each corner
+  const renderHandle = (position: keyof typeof handleStyles) => (
+    <div
+      key={position}
+      style={{
+        position: 'absolute',
+        width: 16,
+        height: 16,
+        background: '#fff',
+        border: '2px solid #6366f1',
+        borderRadius: 9999,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+        ...handleStyles[position],
+        zIndex: 10,
+        display: hovered || isResizing ? 'block' : 'none',
+      }}
+      className="resize-handle"
+    />
+  );
+
   return (
     <Draggable
       position={signature.position}
@@ -61,20 +90,39 @@ const SignatureElement: React.FC<SignatureElementProps> = ({
       onStop={handleDragStop}
       disabled={isResizing}
     >
-      <div className="absolute">
+      <div
+        className="absolute group"
+        style={{ cursor: isDragging ? 'grabbing' : hovered ? 'move' : 'default', zIndex: isDragging ? 20 : 10 }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
         <Resizable
           width={signature.size.width}
           height={signature.size.height}
           onResizeStart={handleResizeStart}
           onResizeStop={handleResizeStop}
-          minConstraints={[100, 50]}
-          maxConstraints={[300, 150]}
+          minConstraints={[10, 10]}
+          maxConstraints={[600, 300]}
+          handle={
+            <>
+              {renderHandle('topLeft')}
+              {renderHandle('topRight')}
+              {renderHandle('bottomLeft')}
+              {renderHandle('bottomRight')}
+            </>
+          }
+          handleSize={[16, 16]}
         >
           <div
             style={{
               width: signature.size.width,
               height: signature.size.height,
               position: 'relative',
+              boxShadow: (isDragging || isResizing) ? '0 4px 16px rgba(0,0,0,0.18)' : '0 1px 4px rgba(0,0,0,0.10)',
+              outline: (isDragging || isResizing || hovered) ? '2px dashed #6366f1' : 'none',
+              outlineOffset: 2,
+              transition: 'box-shadow 0.2s, outline 0.2s',
+              background: 'transparent',
             }}
           >
             <img
@@ -84,15 +132,21 @@ const SignatureElement: React.FC<SignatureElementProps> = ({
                 width: '100%',
                 height: '100%',
                 objectFit: 'contain',
+                pointerEvents: 'none',
+                userSelect: 'none',
               }}
             />
-            <button
-              onClick={() => onDelete(signature.id)}
-              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-              title="Delete signature"
-            >
-              ×
-            </button>
+            {/* Delete button only on hover */}
+            {hovered && (
+              <button
+                onClick={() => onDelete(signature.id)}
+                className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-base shadow-lg hover:bg-red-600 transition-colors"
+                title="Delete signature"
+                style={{ zIndex: 20 }}
+              >
+                ×
+              </button>
+            )}
           </div>
         </Resizable>
       </div>

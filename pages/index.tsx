@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import PDFUploader from '@/components/PDFUploader';
 import PDFViewer from '@/components/PDFViewer';
 import PDFControlsModal from '@/components/PDFControlsModal';
@@ -10,6 +10,7 @@ interface Signature {
   data: string;
   position: { x: number; y: number };
   size: { width: number; height: number };
+  page: number;
 }
 
 export default function Home() {
@@ -21,6 +22,7 @@ export default function Home() {
   const [isRendering, setIsRendering] = useState(false);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [signatures, setSignatures] = useState<Signature[]>([]);
+  const addSignatureCallbackRef = useRef<(() => void) | null>(null);
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
@@ -66,14 +68,16 @@ export default function Home() {
     // Placeholder for add text functionality
   };
   const handleAddSignature = () => {
-    setIsDrawingMode(true);
+    if (addSignatureCallbackRef.current) {
+      addSignatureCallbackRef.current();
+    }
   };
   const handleCloseModal = () => {
     setShowPDFViewer(false);
   };
 
-  const handleDrawingComplete = (signature: Signature) => {
-    setSignatures((prev) => [...prev, signature]);
+  const handleDrawingComplete = (signature: Omit<Signature, 'page'>, page: number) => {
+    setSignatures((prev) => [...prev, { ...signature, page }]);
     setIsDrawingMode(false);
   };
 
@@ -149,8 +153,6 @@ export default function Home() {
                 <div className="pdf-preview-container w-full max-w-[600px] overflow-x-hidden">
                   <PDFViewer
                     file={file}
-                    currentPage={currentPage}
-                    setCurrentPage={setCurrentPage}
                     numPages={numPages}
                     setNumPages={setNumPages}
                     scale={scale}
@@ -161,6 +163,7 @@ export default function Home() {
                     signatures={signatures}
                     onSignatureUpdate={handleSignatureUpdate}
                     onSignatureDelete={handleSignatureDelete}
+                    onRequestAddSignature={(cb: () => void) => { addSignatureCallbackRef.current = () => { setIsDrawingMode(true); cb(); }; }}
                   />
                   <style>{`
                     .pdf-preview-container canvas {

@@ -9,7 +9,7 @@ interface PDFControlsModalProps {
   onNext: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  onCancel: () => void;
+  onDownload: () => void;
   onAddText: () => void;
   onAddSignature: () => void;
   onClose: () => void;
@@ -24,7 +24,7 @@ const PDFControlsModal: React.FC<PDFControlsModalProps> = ({
   onNext,
   onZoomIn,
   onZoomOut,
-  onCancel,
+  onDownload,
   onAddText,
   onAddSignature,
   onClose,
@@ -71,10 +71,10 @@ const PDFControlsModal: React.FC<PDFControlsModalProps> = ({
         </button>
       </div>
       <button
-        onClick={onCancel}
-        className="w-full px-4 py-2 text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg font-medium shadow-sm whitespace-nowrap"
+        onClick={onDownload}
+        className="w-full px-4 py-2 text-white bg-green-600 hover:bg-green-700 border border-green-700 rounded-lg font-medium shadow-sm whitespace-nowrap flex items-center justify-center gap-2"
       >
-        Cancel
+        <span className="text-xl">⬇️</span> Download
       </button>
     </div>
   );

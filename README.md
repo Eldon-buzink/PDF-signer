@@ -1,3 +1,29 @@
+# PDF Signer
+
+This app allows you to upload a PDF, draw your signature directly on any page, and place it exactly where you want. You can also move and resize your signature after drawing.
+
+## Features
+- Upload and preview multi-page PDFs
+- Draw your signature directly on any page
+- Move and resize your signature with intuitive mouse controls
+- Delete signatures
+- Multi-page support: signatures are placed on the correct page
+
+## How to Use
+1. Upload your PDF.
+2. Click the pencil icon to enter signature mode.
+3. Draw your signature on the desired page.
+4. After drawing, you can move your signature by dragging it, or resize it using the handle at the bottom-right corner.
+5. Click the red × button to delete a signature.
+
+## Development
+- Built with Next.js and React
+- Uses [react-signature-canvas](https://github.com/agilgur5/react-signature-canvas) for drawing
+
+---
+
+Enjoy signing your PDFs with precision!
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
 
 ## Getting Started

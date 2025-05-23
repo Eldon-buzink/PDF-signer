@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import type { PDFDocumentProxy, PDFPageProxy } from '@/utils/pdfjs-config';
+import type { TextElement } from '../types';
 import SignatureCanvas from './SignatureCanvas';
 import SignatureElement from './SignatureElement';
+import React from 'react';
+import TextElementComponent from './TextElementComponent';
 
 // Create a singleton render lock
 const renderLock = {
@@ -34,7 +37,7 @@ const PDFViewerComponent = dynamic(
   async () => {
     const { initializePdfJs } = await import('@/utils/pdfjs-config');
     
-    const PDFViewer = ({ file, numPages, setNumPages, scale, setIsRendering, isDrawingMode, onDrawingComplete, onDrawingCancel, signatures, onSignatureUpdate, onSignatureDelete, onRequestAddSignature }: any) => {
+    const PDFViewer = ({ file, numPages, setNumPages, scale, setIsRendering, isDrawingMode, isTextMode, onDrawingComplete, onDrawingCancel, signatures, onSignatureUpdate, onSignatureDelete, textElements, onAddTextElement, onUpdateTextElement, onDeleteTextElement, setIsTextMode, onRequestAddSignature }: any) => {
       const containerRef = useRef<HTMLDivElement>(null);
       const [isLoading, setIsLoading] = useState(true);
       const [error, setError] = useState<string | null>(null);
@@ -150,6 +153,16 @@ const PDFViewerComponent = dynamic(
               const viewport = page.getViewport({ scale });
               canvas.width = viewport.width;
               canvas.height = viewport.height;
+              
+              // Log PDF page dimensions and viewport
+              console.log(`Page ${i} dimensions:`, {
+                originalWidth: page.view[2] - page.view[0],
+                originalHeight: page.view[3] - page.view[1],
+                viewportWidth: viewport.width,
+                viewportHeight: viewport.height,
+                scale: scale
+              });
+
               const context = canvas.getContext('2d', { alpha: false });
               if (context) {
                 context.fillStyle = '#FFFFFF';
@@ -157,17 +170,17 @@ const PDFViewerComponent = dynamic(
                 await page.render({ canvasContext: context, viewport, background: 'rgba(255,255,255,1)' }).promise;
               }
               
-              // Get the immediate parent container's rect
+              // Get the parent container's rect
               const parentContainer = canvas.parentElement;
               if (!parentContainer) continue;
               
               const parentRect = parentContainer.getBoundingClientRect();
               const canvasRect = canvas.getBoundingClientRect();
               
-              // Calculate rect relative to immediate parent
+              // Calculate rect relative to parent container
               rects.push({
-                left: 0, // Since we're using absolute positioning relative to parent
-                top: 0,  // Since we're using absolute positioning relative to parent
+                left: canvasRect.left - parentRect.left,
+                top: canvasRect.top - parentRect.top,
                 width: canvasRect.width,
                 height: canvasRect.height,
               });
@@ -176,7 +189,8 @@ const PDFViewerComponent = dynamic(
               console.log(`Page ${i} measurements:`, {
                 parentRect,
                 canvasRect,
-                relativeRect: rects[i - 1]
+                relativeRect: rects[i - 1],
+                viewport: viewport
               });
             }
           }
@@ -206,64 +220,111 @@ const PDFViewerComponent = dynamic(
               {/* Render all PDF pages as canvases */}
               {pdfDoc && Array.from({ length: pdfDoc.numPages }, (_, i) => {
                 const pageNum = i + 1;
+                console.log(`Rendering page ${pageNum}, signatures:`, signatures);
                 const pageSignatures = signatures.filter((sig: Signature) => sig.page === pageNum);
-                console.log(`Page ${pageNum} signatures:`, pageSignatures);
+                console.log(`Page ${pageNum} filtered signatures:`, pageSignatures);
                 
                 return (
                   <div key={i} className="relative w-full flex justify-center mb-8 last:mb-0">
                     <div className="relative" style={{ width: '100%', maxWidth: '600px' }}>
-                      <div className="relative">
-                        <canvas 
-                          id={`pdf-canvas-${pageNum}`} 
-                          className="w-full h-auto border border-gray-200 shadow-lg bg-white rounded-lg" 
+                      {/* Shared relative container for canvas and signatures */}
+                      <div
+                        className="relative"
+                        style={{
+                          width: canvasRects[i]?.width || '100%',
+                          height: canvasRects[i]?.height || 'auto',
+                        }}
+                      >
+                        <canvas
+                          id={`pdf-canvas-${pageNum}`}
+                          className="w-full h-auto border border-gray-200 shadow-lg bg-white rounded-lg"
+                          style={{ border: '2px solid red' }}
                         />
                         {/* Signature Canvas Layer for this page */}
                         {drawingPage === pageNum && canvasRects[i] && (
-                          <div 
+                          <div
                             className="absolute top-0 left-0"
                             style={{
-                              width: '100%',
-                              height: '100%',
+                              width: canvasRects[i]?.width || '100%',
+                              height: canvasRects[i]?.height || 'auto',
                               pointerEvents: isDrawingMode ? 'auto' : 'none',
                               position: 'absolute',
                               top: 0,
                               left: 0,
                               right: 0,
                               bottom: 0,
+                              border: '2px solid blue',
                             }}
                           >
                             <SignatureCanvas
                               isDrawing={isDrawingMode}
-                              onDrawingComplete={(sig, page) => {
-                                console.log('Drawing complete on page:', page);
-                                onDrawingComplete(sig, page);
+                              onDrawingComplete={(sig) => {
+                                onDrawingComplete(sig, pageNum);
                                 setDrawingPage(null);
                               }}
                               onCancel={() => {
-                                console.log('Drawing cancelled on page:', pageNum);
                                 onDrawingCancel();
                                 setDrawingPage(null);
                               }}
                               containerRef={containerRef}
                               canvasRect={canvasRects[i]}
                               page={pageNum}
+                              cssWidth={canvasRects[i]?.width}
+                              cssHeight={canvasRects[i]?.height}
                             />
                           </div>
                         )}
+                        {/* Placed Signatures for this page */}
+                        {pageSignatures.map((signature: Signature) => (
+                          <SignatureElement
+                            key={signature.id}
+                            signature={signature}
+                            onUpdate={onSignatureUpdate}
+                            onDelete={onSignatureDelete}
+                            cssWidth={canvasRects[i]?.width}
+                            cssHeight={canvasRects[i]?.height}
+                          />
+                        ))}
+                        {/* Page text elements for this page */}
+                        {textElements.filter((textElement: TextElement) => textElement.page === pageNum).map((textElement: TextElement) => (
+                          <TextElementComponent
+                            key={textElement.id}
+                            textElement={textElement}
+                            onUpdate={onUpdateTextElement}
+                            onDelete={onDeleteTextElement}
+                          />
+                        ))}
                       </div>
-                      {/* Placed Signatures for this page */}
-                      {pageSignatures.map((signature: Signature) => (
-                        <SignatureElement
-                          key={signature.id}
-                          signature={signature}
-                          onUpdate={onSignatureUpdate}
-                          onDelete={onSignatureDelete}
-                        />
-                      ))}
                       {/* Page number overlay */}
                       <div className="absolute left-1/2 -translate-x-1/2 bottom-2 bg-white bg-opacity-80 px-3 py-1 rounded-lg shadow text-sm font-semibold text-gray-700 border border-gray-200 select-none pointer-events-none">
                         Page {pageNum} of {pdfDoc.numPages}
                       </div>
+                      {isTextMode && (
+                        <div
+                          className="absolute inset-0 z-50"
+                          style={{ cursor: 'text', background: 'rgba(255,0,0,0.1)' }}
+                          onClick={e => {
+                            console.log('PDFViewer: overlay clicked');
+                            // Only handle left click
+                            if (e.button !== 0) return;
+                            // Get click position relative to the container
+                            const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                            const x = e.clientX - rect.left;
+                            const y = e.clientY - rect.top;
+                            // Add a new text element at this position (default size 120x32)
+                            onAddTextElement({
+                              text: '',
+                              position: { x, y },
+                              size: { width: 120, height: 32 },
+                              page: pageNum,
+                              font: '16px Arial',
+                              color: '#222',
+                            });
+                            setIsTextMode(false);
+                            e.stopPropagation();
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -303,11 +364,17 @@ interface PDFViewerProps {
   scale: number;
   setIsRendering: (isRendering: boolean) => void;
   isDrawingMode: boolean;
+  isTextMode: boolean;
   onDrawingComplete: (signature: Omit<Signature, 'page'>, page: number) => void;
   onDrawingCancel: () => void;
   signatures: Signature[];
   onSignatureUpdate: (signature: Signature) => void;
   onSignatureDelete: (id: string) => void;
+  textElements: TextElement[];
+  onAddTextElement: (textElement: Omit<TextElement, 'id'>) => void;
+  onUpdateTextElement: (textElement: TextElement) => void;
+  onDeleteTextElement: (id: string) => void;
+  setIsTextMode: (val: boolean) => void;
   onRequestAddSignature: (callback: () => void) => void;
 }
 

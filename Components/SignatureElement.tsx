@@ -1,7 +1,4 @@
-import React, { useState, useCallback } from 'react';
-import Draggable from 'react-draggable';
-import { Resizable } from 'react-resizable';
-import 'react-resizable/css/styles.css';
+import React, { useState, useCallback, useRef } from 'react';
 
 interface Signature {
   id: string;
@@ -15,142 +12,155 @@ interface SignatureElementProps {
   signature: Signature;
   onUpdate: (updatedSignature: Signature) => void;
   onDelete: (id: string) => void;
+  cssWidth?: number;
+  cssHeight?: number;
 }
-
-const handleStyles = {
-  topLeft: { left: -8, top: -8, cursor: 'nwse-resize' },
-  topRight: { right: -8, top: -8, cursor: 'nesw-resize' },
-  bottomLeft: { left: -8, bottom: -8, cursor: 'nesw-resize' },
-  bottomRight: { right: -8, bottom: -8, cursor: 'nwse-resize' },
-};
 
 const SignatureElement: React.FC<SignatureElementProps> = ({
   signature,
   onUpdate,
   onDelete,
+  cssWidth,
+  cssHeight,
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [resizing, setResizing] = useState(false);
+  const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const draggingRef = useRef(false);
+  const resizingRef = useRef(false);
 
-  const handleDragStop = useCallback(
-    (e: any, data: { x: number; y: number }) => {
-      setIsDragging(false);
+  // Mouse move handlers for dragging
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setDragging(true);
+    draggingRef.current = true;
+    dragOffset.current = {
+      x: e.clientX - signature.position.x,
+      y: e.clientY - signature.position.y,
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+  const handleMouseMove = (e: MouseEvent) => {
+    if (draggingRef.current) {
+      console.log('SignatureElement: handleMouseMove', e.clientX, e.clientY);
       onUpdate({
         ...signature,
-        position: { x: data.x, y: data.y },
+        position: {
+          x: Math.max(0, Math.min(e.clientX - dragOffset.current.x, (cssWidth ?? 9999) - signature.size.width)),
+          y: Math.max(0, Math.min(e.clientY - dragOffset.current.y, (cssHeight ?? 9999) - signature.size.height)),
+        },
       });
-    },
-    [signature, onUpdate]
-  );
+    }
+  };
+  const handleMouseUp = () => {
+    setDragging(false);
+    draggingRef.current = false;
+    window.removeEventListener('mousemove', handleMouseMove);
+    window.removeEventListener('mouseup', handleMouseUp);
+  };
 
-  const handleResizeStop = useCallback(
-    (e: any, { size }: { size: { width: number; height: number } }) => {
-      setIsResizing(false);
+  // Mouse move handlers for resizing (bottom-right corner)
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setResizing(true);
+    resizingRef.current = true;
+    dragOffset.current = {
+      x: e.clientX - (signature.position.x + signature.size.width),
+      y: e.clientY - (signature.position.y + signature.size.height),
+    };
+    window.addEventListener('mousemove', handleResizeMouseMove);
+    window.addEventListener('mouseup', handleResizeMouseUp);
+  };
+  const handleResizeMouseMove = (e: MouseEvent) => {
+    if (resizingRef.current) {
+      console.log('SignatureElement: handleResizeMouseMove', e.clientX, e.clientY);
+      const newWidth = Math.max(20, Math.min(e.clientX - signature.position.x - dragOffset.current.x, (cssWidth ?? 9999) - signature.position.x));
+      const newHeight = Math.max(20, Math.min(e.clientY - signature.position.y - dragOffset.current.y, (cssHeight ?? 9999) - signature.position.y));
       onUpdate({
         ...signature,
-        size,
+        size: {
+          width: newWidth,
+          height: newHeight,
+        },
       });
-    },
-    [signature, onUpdate]
-  );
-
-  const handleDragStart = useCallback(() => {
-    setIsDragging(true);
-  }, []);
-
-  const handleResizeStart = useCallback(() => {
-    setIsResizing(true);
-  }, []);
-
-  // Custom handle for each corner
-  const renderHandle = (position: keyof typeof handleStyles) => (
-    <div
-      key={position}
-      style={{
-        position: 'absolute',
-        width: 16,
-        height: 16,
-        background: '#fff',
-        border: '2px solid #6366f1',
-        borderRadius: 9999,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-        ...handleStyles[position],
-        zIndex: 10,
-        display: hovered || isResizing ? 'block' : 'none',
-      }}
-      className="resize-handle"
-    />
-  );
+    }
+  };
+  const handleResizeMouseUp = () => {
+    setResizing(false);
+    resizingRef.current = false;
+    window.removeEventListener('mousemove', handleResizeMouseMove);
+    window.removeEventListener('mouseup', handleResizeMouseUp);
+  };
 
   return (
-    <Draggable
-      position={signature.position}
-      onStart={handleDragStart}
-      onStop={handleDragStop}
-      disabled={isResizing}
+    <div
+      style={{
+        position: 'absolute',
+        left: signature.position.x,
+        top: signature.position.y,
+        width: signature.size.width,
+        height: signature.size.height,
+        zIndex: 1000,
+        cursor: dragging ? 'grabbing' : 'move',
+        userSelect: 'none',
+        pointerEvents: 'auto',
+      }}
+      onMouseDown={(e) => { console.log('SignatureElement: onMouseDown', e); handleMouseDown(e); }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <div
-        className="absolute group"
-        style={{ cursor: isDragging ? 'grabbing' : hovered ? 'move' : 'default', zIndex: isDragging ? 20 : 10 }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        style={{
+          width: '100%',
+          height: '100%',
+          background: 'transparent',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+          outline: 'none',
+        }}
       >
-        <Resizable
-          width={signature.size.width}
-          height={signature.size.height}
-          onResizeStart={handleResizeStart}
-          onResizeStop={handleResizeStop}
-          minConstraints={[10, 10]}
-          maxConstraints={[600, 300]}
-          handle={
-            <>
-              {renderHandle('topLeft')}
-              {renderHandle('topRight')}
-              {renderHandle('bottomLeft')}
-              {renderHandle('bottomRight')}
-            </>
-          }
-          handleSize={[16, 16]}
-        >
-          <div
-            style={{
-              width: signature.size.width,
-              height: signature.size.height,
-              position: 'relative',
-              boxShadow: (isDragging || isResizing) ? '0 4px 16px rgba(0,0,0,0.18)' : '0 1px 4px rgba(0,0,0,0.10)',
-              outline: (isDragging || isResizing || hovered) ? '2px dashed #6366f1' : 'none',
-              outlineOffset: 2,
-              transition: 'box-shadow 0.2s, outline 0.2s',
-              background: 'transparent',
-            }}
+        <img
+          src={signature.data}
+          alt="Signature"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+        />
+        {/* Resize handle (bottom-right corner) */}
+        <div
+          onMouseDown={(e) => { console.log('SignatureElement: resize handle onMouseDown', e); handleResizeMouseDown(e); }}
+          style={{
+            position: 'absolute',
+            right: -8,
+            bottom: -8,
+            width: 16,
+            height: 16,
+            background: '#fff',
+            border: '2px solid #6366f1',
+            borderRadius: 9999,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+            cursor: 'nwse-resize',
+            zIndex: 10,
+            display: hovered ? 'block' : 'none',
+          }}
+        />
+        {/* Delete button only on hover */}
+        {hovered && (
+          <button
+            onClick={(e) => { e.stopPropagation(); console.log('SignatureElement: onDelete', signature.id); onDelete(signature.id); }}
+            className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-base shadow-lg hover:bg-red-600 transition-colors"
+            title="Delete signature"
+            style={{ zIndex: 20 }}
           >
-            <img
-              src={signature.data}
-              alt="Signature"
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                pointerEvents: 'none',
-                userSelect: 'none',
-              }}
-            />
-            {/* Delete button only on hover */}
-            {hovered && (
-              <button
-                onClick={() => onDelete(signature.id)}
-                className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-base shadow-lg hover:bg-red-600 transition-colors"
-                title="Delete signature"
-                style={{ zIndex: 20 }}
-              >
-                ×
-              </button>
-            )}
-          </div>
-        </Resizable>
+            ×
+          </button>
+        )}
       </div>
-    </Draggable>
+    </div>
   );
 };
 

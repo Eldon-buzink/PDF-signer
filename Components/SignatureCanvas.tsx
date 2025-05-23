@@ -19,6 +19,8 @@ interface SignatureCanvasProps {
   containerRef: React.RefObject<HTMLDivElement>;
   canvasRect: { left: number; top: number; width: number; height: number } | null;
   page: number;
+  cssWidth?: number;
+  cssHeight?: number;
 }
 
 const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
@@ -28,6 +30,8 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
   containerRef,
   canvasRect,
   page,
+  cssWidth,
+  cssHeight,
 }) => {
   const signaturePadRef = useRef<SignaturePad>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
@@ -155,14 +159,27 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
       }
       const croppedDataUrl = croppedCanvas.toDataURL();
       
-      // Calculate position relative to the current page
+      // Transform coordinates to match browser coordinate system (top-left origin)
       const position = {
-        x: Math.min(minX, maxWidth - width),
-        y: Math.min(minY, maxHeight - height)
+        x: minX,
+        y: minY // Do NOT invert Y here
       };
 
+      // Debug: log overlay and canvas bounding rects
+      if (containerRef.current) {
+        const overlayRect = containerRef.current.getBoundingClientRect();
+        console.log('Debug: Signature overlay bounding rect:', overlayRect);
+        const canvas = document.getElementById(`pdf-canvas-${page}`);
+        if (canvas) {
+          const canvasRect = canvas.getBoundingClientRect();
+          console.log('Debug: PDF canvas bounding rect:', canvasRect);
+        }
+      }
+      console.log('Debug: Signature position and size:', { position, width, height });
+
       console.log('Creating signature on page:', page);
-      console.log('Signature position:', position);
+      console.log('Original position:', { minX, minY });
+      console.log('Transformed position:', position);
       console.log('Signature size:', { width, height });
       console.log('Canvas bounds:', { maxWidth, maxHeight });
 
@@ -173,6 +190,7 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
         size: { width, height },
       };
       
+      console.log('handleComplete called for page:', page);
       onDrawingComplete(newSignature, page);
       handleClear();
       setIsDrawingMode(false);
@@ -186,7 +204,11 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
 
   if (!isDrawingMode || !canvasRect) return null;
 
-  console.log('SignatureCanvas: canvasRect', canvasRect);
+  // Use CSS pixel size for the overlay and SignaturePad
+  const overlayWidth = cssWidth ?? canvasRect.width;
+  const overlayHeight = cssHeight ?? canvasRect.height;
+
+  console.log('SignatureCanvas: using CSS size', { overlayWidth, overlayHeight });
 
   return (
     <div
@@ -194,8 +216,8 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
       style={{
         left: 0,
         top: 0,
-        width: canvasRect.width,
-        height: canvasRect.height,
+        width: overlayWidth,
+        height: overlayHeight,
         zIndex: 1000,
         overflow: 'hidden',
         backgroundColor: 'transparent',
@@ -205,8 +227,8 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
       <div 
         className="absolute inset-0 pointer-events-auto"
         style={{
-          width: canvasRect.width,
-          height: canvasRect.height,
+          width: overlayWidth,
+          height: overlayHeight,
         }}
       >
         <SignaturePad
@@ -216,11 +238,11 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
           maxWidth={1.5}
           canvasProps={{
             className: 'signature-canvas',
-            width: Math.round(canvasRect.width),
-            height: Math.round(canvasRect.height),
+            width: Math.round(overlayWidth),
+            height: Math.round(overlayHeight),
             style: {
-              width: `${canvasRect.width}px`,
-              height: `${canvasRect.height}px`,
+              width: `${overlayWidth}px`,
+              height: `${overlayHeight}px`,
               backgroundColor: 'transparent',
             },
           }}

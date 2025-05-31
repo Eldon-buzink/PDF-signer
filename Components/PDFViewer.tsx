@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import type { PDFDocumentProxy, PDFPageProxy } from '@/utils/pdfjs-config';
 import type { TextElement } from '../types';
-import SignatureCanvas from './SignatureCanvas';
+import SignatureCanvas, { SignatureCanvasHandle } from './SignatureCanvas';
 import SignatureElement from './SignatureElement';
 import React from 'react';
 import TextElementComponent from './TextElementComponent';
@@ -37,81 +37,18 @@ const PDFViewerComponent = dynamic(
   async () => {
     const { initializePdfJs } = await import('@/utils/pdfjs-config');
     
-    const PDFViewer = ({ file, numPages, setNumPages, scale, setIsRendering, isDrawingMode, isTextMode, onDrawingComplete, onDrawingCancel, signatures, onSignatureUpdate, onSignatureDelete, textElements, onAddTextElement, onUpdateTextElement, onDeleteTextElement, setIsTextMode, onRequestAddSignature }: any) => {
+    const PDFViewer = ({ file, numPages, setNumPages, scale, setIsRendering, isDrawingMode, isTextMode, onDrawingComplete, onDrawingCancel, signatures, onSignatureUpdate, onSignatureDelete, textElements, onAddTextElement, onUpdateTextElement, onDeleteTextElement, setIsTextMode }: any) => {
       const containerRef = useRef<HTMLDivElement>(null);
       const [isLoading, setIsLoading] = useState(true);
       const [error, setError] = useState<string | null>(null);
       const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
       const [canvasRects, setCanvasRects] = useState<{left: number, top: number, width: number, height: number}[]>([]);
-      const [drawingPage, setDrawingPage] = useState<number | null>(null);
-
-      // Detect most visible page in viewport
-      const getMostVisiblePage = () => {
-        if (!containerRef.current) return 1;
-        const pageDivs = Array.from(containerRef.current.querySelectorAll('canvas'));
-        let maxVisible = 0;
-        let mostVisiblePage = 1;
-        
-        // Get viewport height
-        const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-        const viewportTop = window.scrollY;
-        const viewportBottom = viewportTop + vh;
-        
-        console.log('Viewport:', { top: viewportTop, bottom: viewportBottom, height: vh });
-        
-        pageDivs.forEach((canvas, idx) => {
-          const rect = canvas.getBoundingClientRect();
-          const pageTop = rect.top + window.scrollY;
-          const pageBottom = pageTop + rect.height;
-          
-          // Calculate how much of the page is visible
-          const visibleTop = Math.max(viewportTop, pageTop);
-          const visibleBottom = Math.min(viewportBottom, pageBottom);
-          const visible = Math.max(0, visibleBottom - visibleTop);
-          
-          console.log(`Page ${idx + 1} visibility:`, {
-            pageTop,
-            pageBottom,
-            visibleTop,
-            visibleBottom,
-            visible,
-            rect
-          });
-          
-          if (visible > maxVisible) {
-            maxVisible = visible;
-            mostVisiblePage = idx + 1;
-          }
-        });
-        
-        console.log('Most visible page:', mostVisiblePage, 'with visibility:', maxVisible);
-        return mostVisiblePage;
-      };
-
-      // Expose a method to parent to trigger drawing mode for a specific page
+      // Create an array of refs for each page
+      const signaturePadRefs = useRef<(SignatureCanvasHandle | null)[]>([]);
+      // Initialize refs array when numPages changes
       useEffect(() => {
-        if (onRequestAddSignature) {
-          onRequestAddSignature(() => {
-            const page = getMostVisiblePage();
-            console.log('Setting drawing page to:', page);
-            setDrawingPage(page);
-          });
-        }
-      }, [onRequestAddSignature]);
-
-      // Add scroll event listener to update drawing page
-      useEffect(() => {
-        const handleScroll = () => {
-          if (isDrawingMode) {
-            const page = getMostVisiblePage();
-            console.log('Scroll detected, most visible page:', page);
-            setDrawingPage(page);
-          }
-        };
-
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-      }, [isDrawingMode]);
+        signaturePadRefs.current = Array(numPages).fill(null);
+      }, [numPages]);
 
       // Load PDF document
       useEffect(() => {
@@ -165,6 +102,7 @@ const PDFViewerComponent = dynamic(
 
               const context = canvas.getContext('2d', { alpha: false });
               if (context) {
+                context.clearRect(0, 0, canvas.width, canvas.height);
                 context.fillStyle = '#FFFFFF';
                 context.fillRect(0, 0, canvas.width, canvas.height);
                 await page.render({ canvasContext: context, viewport, background: 'rgba(255,255,255,1)' }).promise;
@@ -200,6 +138,14 @@ const PDFViewerComponent = dynamic(
         renderAllPages();
       }, [pdfDoc, scale, setIsRendering]);
 
+      useEffect(() => {
+        const resetHandler = () => {
+          signaturePadRefs.current.forEach(ref => ref?.clear());
+        };
+        window.addEventListener('resetActiveSignaturePage', resetHandler);
+        return () => window.removeEventListener('resetActiveSignaturePage', resetHandler);
+      }, []);
+
       return (
         <div className="w-full h-full flex flex-col">
           <div className="flex-1 relative overflow-auto bg-gray-100 rounded-lg">
@@ -217,17 +163,77 @@ const PDFViewerComponent = dynamic(
               </div>
             )}
             <div ref={containerRef} className="min-h-full flex flex-col items-center justify-start p-4 gap-8 relative overflow-y-auto max-h-[80vh]">
+              {isDrawingMode && (
+                <div
+                  className="bg-white rounded-xl shadow-2xl p-1.5 md:p-2 flex space-x-1 md:space-x-3 pointer-events-auto border border-gray-200 z-[1100]"
+                  style={{
+                    position: 'sticky',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    minWidth: 180,
+                    maxWidth: '98%',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      // Clear all signature pads
+                      signaturePadRefs.current.forEach(ref => ref?.clear());
+                    }}
+                    className="px-2 py-1 md:px-4 md:py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm md:text-base font-semibold text-gray-700 shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
+                    title="Clear"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Undo on all signature pads
+                      signaturePadRefs.current.forEach(ref => ref?.undo());
+                    }}
+                    className="px-2 py-1 md:px-4 md:py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm md:text-base font-semibold text-gray-700 shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
+                    title="Undo"
+                  >
+                    Undo
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Complete all signature pads
+                      signaturePadRefs.current.forEach((ref, index) => {
+                        if (ref) {
+                          ref.complete();
+                        }
+                      });
+                    }}
+                    className="px-2 py-1 md:px-4 md:py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm md:text-base font-semibold text-white shadow-md transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    title="Done"
+                  >
+                    Done
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Cancel all signature pads
+                      signaturePadRefs.current.forEach(ref => ref?.cancel());
+                    }}
+                    className="px-2 py-1 md:px-4 md:py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm md:text-base font-semibold text-gray-700 shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
+                    title="Cancel"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
               {/* Render all PDF pages as canvases */}
               {pdfDoc && Array.from({ length: pdfDoc.numPages }, (_, i) => {
                 const pageNum = i + 1;
-                console.log(`Rendering page ${pageNum}, signatures:`, signatures);
                 const pageSignatures = signatures.filter((sig: Signature) => sig.page === pageNum);
-                console.log(`Page ${pageNum} filtered signatures:`, pageSignatures);
-                
                 return (
                   <div key={i} className="relative w-full flex justify-center mb-8 last:mb-0">
-                    <div className="relative" style={{ width: '100%', maxWidth: '600px' }}>
-                      {/* Shared relative container for canvas and signatures */}
+                    <div
+                      className="relative overflow-auto w-full max-w-[600px] md:max-w-[800px] lg:max-w-[900px]"
+                      style={{ width: canvasRects[i]?.width || undefined }}
+                    >
                       <div
                         className="relative"
                         style={{
@@ -237,34 +243,35 @@ const PDFViewerComponent = dynamic(
                       >
                         <canvas
                           id={`pdf-canvas-${pageNum}`}
-                          className="w-full h-auto border border-gray-200 shadow-lg bg-white rounded-lg"
+                          className="border border-gray-200 shadow-lg bg-white rounded-lg"
                           style={{ border: '2px solid red' }}
                         />
-                        {/* Signature Canvas Layer for this page */}
-                        {drawingPage === pageNum && canvasRects[i] && (
+                        {/* Signature Canvas Layer for all pages when in drawing mode */}
+                        {isDrawingMode && canvasRects[i] && (
                           <div
                             className="absolute top-0 left-0"
                             style={{
                               width: canvasRects[i]?.width || '100%',
                               height: canvasRects[i]?.height || 'auto',
-                              pointerEvents: isDrawingMode ? 'auto' : 'none',
+                              pointerEvents: 'auto',
                               position: 'absolute',
                               top: 0,
                               left: 0,
                               right: 0,
                               bottom: 0,
-                              border: '2px solid blue',
+                              overflow: 'hidden',
                             }}
                           >
                             <SignatureCanvas
-                              isDrawing={isDrawingMode}
+                              ref={(ref) => {
+                                signaturePadRefs.current[i] = ref;
+                              }}
+                              isDrawing={true}
                               onDrawingComplete={(sig) => {
                                 onDrawingComplete(sig, pageNum);
-                                setDrawingPage(null);
                               }}
                               onCancel={() => {
                                 onDrawingCancel();
-                                setDrawingPage(null);
                               }}
                               containerRef={containerRef}
                               canvasRect={canvasRects[i]}
@@ -304,14 +311,10 @@ const PDFViewerComponent = dynamic(
                           className="absolute inset-0 z-50"
                           style={{ cursor: 'text', background: 'rgba(255,0,0,0.1)' }}
                           onClick={e => {
-                            console.log('PDFViewer: overlay clicked');
-                            // Only handle left click
                             if (e.button !== 0) return;
-                            // Get click position relative to the container
                             const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
                             const x = e.clientX - rect.left;
                             const y = e.clientY - rect.top;
-                            // Add a new text element at this position (default size 120x32)
                             onAddTextElement({
                               text: '',
                               position: { x, y },
@@ -375,7 +378,6 @@ interface PDFViewerProps {
   onUpdateTextElement: (textElement: TextElement) => void;
   onDeleteTextElement: (id: string) => void;
   setIsTextMode: (val: boolean) => void;
-  onRequestAddSignature: (callback: () => void) => void;
 }
 
 export default function PDFViewer(props: PDFViewerProps) {

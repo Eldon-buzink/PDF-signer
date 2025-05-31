@@ -45,12 +45,12 @@ export default function Home() {
   };
   const handleZoomIn = () => {
     if (!isRendering) {
-      setScale(prev => Math.min(prev + 0.2, 3.0));
+      setScale(prev => Math.min(prev + 0.1, 3.0));
     }
   };
   const handleZoomOut = () => {
     if (!isRendering) {
-      setScale(prev => Math.max(prev - 0.2, 0.5));
+      setScale(prev => Math.max(prev - 0.1, 0.5));
     }
   };
   const handleCancel = () => {
@@ -130,13 +130,12 @@ export default function Home() {
     setShowThankYou(true);
   };
   const handleAddText = () => {
-    console.log('handleAddText called');
+    setIsDrawingMode(false);
     setIsTextMode(true);
   };
   const handleAddSignature = () => {
-    if (addSignatureCallbackRef.current) {
-      addSignatureCallbackRef.current();
-    }
+    setIsTextMode(false);
+    setIsDrawingMode(true);
   };
   const handleCloseModal = () => {
     setShowPDFViewer(false);
@@ -179,6 +178,9 @@ export default function Home() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-4">
       {showThankYou && (
         <div className="bg-white p-8 rounded-3xl shadow-lg w-full max-w-lg mb-8 flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center w-full">
+            <img src="/pdf-mascot.png" alt="PDF Mascot" className="mx-auto mb-3" style={{ maxWidth: 300, width: '100%', height: 'auto' }} />
+          </div>
           <h1 className="text-2xl font-semibold text-[#0F172A] mb-4 text-center">Thank you for signing!</h1>
           <p className="text-gray-700 text-center mb-6">Your signed PDF has been downloaded.<br/>If you need to sign another document, you can upload a new PDF below.</p>
           <button
@@ -191,6 +193,9 @@ export default function Home() {
       )}
       {!showPDFViewer && !showThankYou && (
         <div className="bg-white p-8 rounded-3xl shadow-lg w-full max-w-lg mb-8">
+          <div className="flex flex-col items-center w-full justify-center">
+            <img src="/pdf-mascot.png" alt="PDF Mascot" className="mx-auto mb-3 block" style={{ maxWidth: 300, width: '100%', height: 'auto' }} />
+          </div>
           <h1 className="text-2xl font-semibold text-[#0F172A] mb-8 text-center">
             Upload Your PDF to Sign
           </h1>
@@ -207,9 +212,7 @@ export default function Home() {
             )}
             <button
               type="submit"
-              className="w-full bg-[#4F46E5] text-white py-3 rounded-xl font-medium 
-                        hover:bg-[#4338CA] transition-colors disabled:opacity-50 
-                        disabled:hover:bg-[#4F46E5]"
+              className="w-full bg-gradient-to-r from-[#7b3ff2] to-[#3f8efc] text-white py-3 rounded-xl font-bold font-sans transition-colors disabled:opacity-50 disabled:hover:bg-[#7b3ff2] shadow-lg"
               disabled={!file}
             >
               Proceed to Sign
@@ -222,9 +225,9 @@ export default function Home() {
         <>
           {/* Main content area: PDF preview and button modal as a group */}
           <div className="w-full flex flex-col items-center justify-center min-h-[80vh]">
-            <div className="flex flex-col md:flex-row items-center justify-center w-full gap-8">
+            <div className="flex flex-col md:flex-row items-center justify-center w-full gap-4 md:gap-8">
               {/* PDF preview group: name modal above preview */}
-              <div className="flex flex-col items-center w-full md:w-[600px] max-w-full">
+              <div className="flex flex-col items-center w-full max-w-[600px] md:max-w-[800px] lg:max-w-[900px]">
                 {/* PDF name modal above preview, not inside preview */}
                 <div className="mb-2">
                   <div className="mx-auto bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-row items-center px-4 py-2 max-w-md w-auto">
@@ -242,7 +245,7 @@ export default function Home() {
                     </button>
                   </div>
                 </div>
-                <div className="pdf-preview-container w-full max-w-[600px] overflow-x-hidden">
+                <div className="pdf-preview-container w-full max-w-[600px] md:max-w-[800px] lg:max-w-[900px] overflow-x-auto">
                   <PDFViewer
                     file={file}
                     numPages={numPages}
@@ -261,21 +264,11 @@ export default function Home() {
                     onUpdateTextElement={handleUpdateTextElement}
                     onDeleteTextElement={handleDeleteTextElement}
                     setIsTextMode={setIsTextMode}
-                    onRequestAddSignature={(cb: () => void) => { addSignatureCallbackRef.current = () => { setIsDrawingMode(true); cb(); }; }}
                   />
-                  <style>{`
-                    .pdf-preview-container canvas {
-                      width: 100% !important;
-                      max-width: 100% !important;
-                      height: auto !important;
-                      display: block;
-                      margin: 0 auto;
-                    }
-                  `}</style>
                 </div>
               </div>
               {/* Button modal to the right of PDF preview, centered */}
-              <div className="flex flex-col items-center self-center w-full md:w-[320px] mt-6 md:mt-0">
+              <div className="flex flex-col items-center self-center w-full md:w-[320px] mt-4 md:mt-0 sticky bottom-4 md:relative z-50">
                 <PDFControlsModal
                   currentPage={currentPage}
                   numPages={numPages}

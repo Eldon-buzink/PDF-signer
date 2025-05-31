@@ -1,8 +1,15 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import SignaturePad from 'react-signature-canvas';
 import Draggable from 'react-draggable';
 import { Resizable } from 'react-resizable';
 import 'react-resizable/css/styles.css';
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+type SignatureData = Point[][];
 
 interface Signature {
   id: string;
@@ -23,16 +30,24 @@ interface SignatureCanvasProps {
   cssHeight?: number;
 }
 
-const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
-  isDrawing,
-  onDrawingComplete,
-  onCancel,
-  containerRef,
-  canvasRect,
-  page,
-  cssWidth,
-  cssHeight,
-}) => {
+export interface SignatureCanvasHandle {
+  clear: () => void;
+  undo: () => void;
+  complete: () => void;
+  cancel: () => void;
+}
+
+const SignatureCanvas = forwardRef<SignatureCanvasHandle, SignatureCanvasProps>((props, ref) => {
+  const {
+    isDrawing,
+    onDrawingComplete,
+    onCancel,
+    containerRef,
+    canvasRect,
+    page,
+    cssWidth,
+    cssHeight,
+  } = props;
   const signaturePadRef = useRef<SignaturePad>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
@@ -91,43 +106,19 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
   const handleComplete = () => {
     if (signaturePadRef.current && !signaturePadRef.current.isEmpty()) {
       // Calculate bounding box of the drawing
-      const data = signaturePadRef.current.toData();
+      const data = signaturePadRef.current.toData() as SignatureData;
       console.log('SignaturePad toData:', data);
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       if (Array.isArray(data) && data.length > 0) {
-        if (Array.isArray(data[0])) {
-          // Array of arrays of points (Point[][])
-          const flatPoints = data.flat();
-          console.log('First 5 points (flattened):', flatPoints.slice(0, 5));
-          flatPoints.forEach((pt: any) => {
-            if (pt.x < minX) minX = pt.x;
-            if (pt.y < minY) minY = pt.y;
-            if (pt.x > maxX) maxX = pt.x;
-            if (pt.y > maxY) maxY = pt.y;
-          });
-        } else if (typeof data[0].x === 'number' && typeof data[0].y === 'number') {
-          // Flat array of points
-          console.log('First 5 points:', data.slice(0, 5));
-          data.forEach((pt: any) => {
-            if (pt.x < minX) minX = pt.x;
-            if (pt.y < minY) minY = pt.y;
-            if (pt.x > maxX) maxX = pt.x;
-            if (pt.y > maxY) maxY = pt.y;
-          });
-        } else {
-          // Array of strokes with points
-          data.forEach((stroke: any, idx: number) => {
-            console.log('Stroke', idx, stroke);
-            if (stroke && Array.isArray(stroke.points)) {
-              stroke.points.forEach((pt: any) => {
-                if (pt.x < minX) minX = pt.x;
-                if (pt.y < minY) minY = pt.y;
-                if (pt.x > maxX) maxX = pt.x;
-                if (pt.y > maxY) maxY = pt.y;
-              });
-            }
-          });
-        }
+        // Array of arrays of points (Point[][])
+        const flatPoints = data.flat();
+        console.log('First 5 points (flattened):', flatPoints.slice(0, 5));
+        flatPoints.forEach((pt: Point) => {
+          if (pt.x < minX) minX = pt.x;
+          if (pt.y < minY) minY = pt.y;
+          if (pt.x > maxX) maxX = pt.x;
+          if (pt.y > maxY) maxY = pt.y;
+        });
       }
       console.log('Bounding box after calculation:', { minX, minY, maxX, maxY });
       
@@ -202,6 +193,15 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     console.log('SignaturePad: onEnd fired (drawing event)');
   };
 
+  // Always call useImperativeHandle before any return
+  useImperativeHandle(ref, () => ({
+    clear: handleClear,
+    undo: handleUndo,
+    complete: handleComplete,
+    cancel: onCancel,
+  }));
+
+  // Now do the conditional return
   if (!isDrawingMode || !canvasRect) return null;
 
   // Use CSS pixel size for the overlay and SignaturePad
@@ -248,41 +248,8 @@ const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
           }}
         />
       </div>
-      {/* Toolbar */}
-      {showToolbar && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl p-2 flex space-x-3 pointer-events-auto border border-gray-200">
-          <button
-            onClick={handleClear}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-base font-semibold text-gray-700 shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
-            title="Clear"
-          >
-            Clear
-          </button>
-          <button
-            onClick={handleUndo}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-base font-semibold text-gray-700 shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
-            title="Undo"
-          >
-            Undo
-          </button>
-          <button
-            onClick={handleComplete}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-base font-semibold text-white shadow-md transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            title="Done"
-          >
-            Done
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-base font-semibold text-gray-700 shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
-            title="Cancel"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
     </div>
   );
-};
+});
 
 export default SignatureCanvas; 

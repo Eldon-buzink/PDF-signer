@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import type { PDFDocumentProxy, PDFPageProxy } from '@/utils/pdfjs-config';
+import type { PDFDocumentProxy, PDFPageProxy } from '../utils/pdfjs-config';
 import type { TextElement } from '../types';
 import SignatureCanvas, { SignatureCanvasHandle } from './SignatureCanvas';
 import SignatureElement from './SignatureElement';
@@ -35,7 +35,7 @@ const renderLock = {
 // Dynamically import the PDF viewer to prevent SSR issues
 const PDFViewerComponent = dynamic(
   async () => {
-    const { initializePdfJs } = await import('@/utils/pdfjs-config');
+    const { initializePdfJs } = await import('../utils/pdfjs-config');
     
     const PDFViewer = ({ file, numPages, setNumPages, scale, setIsRendering, isDrawingMode, isTextMode, onDrawingComplete, onDrawingCancel, signatures, onSignatureUpdate, onSignatureDelete, textElements, onAddTextElement, onUpdateTextElement, onDeleteTextElement, setIsTextMode }: any) => {
       const containerRef = useRef<HTMLDivElement>(null);

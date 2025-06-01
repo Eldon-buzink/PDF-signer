@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import PDFUploader from '../components/PDFUploader';
-import PDFViewer from '../components/PDFViewer';
-import PDFControlsModal from '../components/PDFControlsModal';
+import PDFUploader from '@/components/PDFUploader';
+import PDFViewer from '@/components/PDFViewer';
+import PDFControlsModal from '@/components/PDFControlsModal';
 import type { Signature, TextElement } from '../types';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 

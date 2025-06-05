@@ -23,6 +23,7 @@ export default function Home() {
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
+    setScale(1.0);
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -254,6 +255,7 @@ export default function Home() {
                     setIsRendering={setIsRendering}
                     isDrawingMode={isDrawingMode}
                     isTextMode={isTextMode}
+                    currentPage={currentPage}
                     onDrawingComplete={handleDrawingComplete}
                     onDrawingCancel={handleDrawingCancel}
                     signatures={signatures}
